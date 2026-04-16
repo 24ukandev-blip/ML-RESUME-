@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Resume Analyzer Suite</title>
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: black; color: white; overflow-x: hidden; }
+        .bg { position: fixed; width: 100%; height: 100%; background: radial-gradient(circle at 20% 30%, #0a0f2a, #000000); z-index: -2; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 25px 20px; position: relative; z-index: 10; }
+        h1 { text-align: center; font-size: 2.4rem; background: linear-gradient(135deg, #38bdf8, #c084fc); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 20px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 1px solid rgba(56,189,248,0.3); padding-bottom: 10px; flex-wrap: wrap; }
+        .tab-btn { background: transparent; border: none; color: #ccc; font-size: 1.1rem; padding: 8px 20px; cursor: pointer; transition: 0.3s; }
+        .tab-btn.active { color: #38bdf8; border-bottom: 2px solid #38bdf8; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        textarea { width: 100%; height: 140px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); border: 1.5px solid #38bdf8; color: white; padding: 16px; border-radius: 24px; font-size: 1rem; resize: vertical; }
+        button { margin-top: 20px; padding: 14px 28px; font-size: 1.2rem; font-weight: bold; background: linear-gradient(95deg, #0ea5e9, #8b5cf6); border: none; border-radius: 60px; color: white; cursor: pointer; width: 100%; transition: 0.2s; }
+        button:hover { transform: scale(1.02); box-shadow: 0 0 28px #8b5cf6; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .card { background: rgba(15,25,45,0.65); backdrop-filter: blur(12px); border-radius: 28px; padding: 22px; margin: 20px 0; border: 1px solid rgba(56,189,248,0.3); }
+        .skill { display: inline-block; background: linear-gradient(145deg, #2dd4bf, #3b82f6); color: #0a0f2a; font-weight: bold; padding: 5px 16px; margin: 5px; border-radius: 40px; }
+        .bar-bg { background: #1e293b; border-radius: 30px; overflow: hidden; margin-top: 8px; }
+        .bar { height: 12px; border-radius: 30px; width: 0%; transition: width 1s cubic-bezier(0.2,0.9,0.5,1.1); }
+        .upload-area, .file-upload-area { border: 2px dashed #38bdf8; border-radius: 28px; padding: 40px; text-align: center; cursor: pointer; margin-bottom: 20px; transition: all 0.3s; }
+        .file-upload-area { border-color: #22c55e; background: rgba(34,197,94,0.05); }
+        .upload-area.drag-over, .file-upload-area.drag-over { background: rgba(56,189,248,0.1); border-color: #facc15; }
+        pre { background: rgba(0,0,0,0.5); padding: 12px; border-radius: 16px; overflow-x: auto; font-size: 0.85rem; }
+        img { max-width: 100%; border-radius: 16px; margin: 10px 0; }
+        .prob-bar { background: #1e293b; border-radius: 10px; margin: 5px 0; overflow: hidden; }
+        .prob-fill { height: 20px; background: linear-gradient(95deg, #0ea5e9, #8b5cf6); width: 0%; transition: width 0.5s; }
+        @media (max-width: 700px) { h1 { font-size: 1.8rem; } }
+    </style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="container">
+    <h1>⚡ Resume Analyzer Suite</h1>
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="resume">📄 Resume Skill Analyzer</button>
+        <button class="tab-btn" data-tab="dataset">📊 Dataset Training</button>
+        <button class="tab-btn" data-tab="predict">🔮 Single Resume Prediction</button>
+    </div>
+
+    <!-- Tab 1: Resume Skill Analyzer (paste + file upload) -->
+    <div id="resumeTab" class="tab-content active">
+        <div class="file-upload-area" id="singleResumeUploadArea">
+            📁 Click or drag a resume file (.txt, .pdf, .docx) to analyze
+            <input type="file" id="singleResumeFileInput" accept=".txt,.pdf,.docx" style="display:none;">
+        </div>
+        <textarea id="resumeText" placeholder="Or paste your resume text here..."></textarea>
+        <button id="analyzeBtn">✨ Analyze (Text) ✨</button>
+        <div id="resultsArea"></div>
+    </div>
+
+    <!-- Tab 2: Dataset Training (CSV upload) -->
+    <div id="datasetTab" class="tab-content">
+        <div id="uploadArea" class="upload-area">
+            📁 Drag & Drop CSV file here or click to upload<br>
+            <small>(Must contain 'Resume' and 'Category' columns)</small>
+            <input type="file" id="fileInput" accept=".csv" style="display:none;">
+        </div>
+        <button id="analyzeDatasetBtn">🔍 Train Model on Dataset</button>
+        <div id="datasetResults"></div>
+    </div>
+
+    <!-- Tab 3: Single Resume Prediction (using trained model) -->
+    <div id="predictTab" class="tab-content">
+        <textarea id="predictResumeText" placeholder="Paste a resume to predict its job category..."></textarea>
+        <button id="predictBtn">🎯 Predict Category</button>
+        <div id="predictResults"></div>
+    </div>
+</div>
+
+<script>
+    const BACKEND_URL = 'http://127.0.0.1:5000';
+
+    // Helper: display skill analysis results (with animation)
+    function displaySkillResults(data, targetDiv) {
+        const skills = data.skills || [];
+        const jobs = data.jobs || [];
+        const bestRole = data.best_job || 'Tech Professional';
+        const totalScore = data.resume_score || 0;
+        const missing = data.missing || [];
+
+        let html = `
+            <div class="card">
+                <h3>🎯 MATCH SCORE · ${bestRole}</h3>
+                <div style="font-size:3rem;font-weight:800" class="animatedScore">0%</div>
+                <div class="bar-bg"><div class="mainBar bar" style="background:linear-gradient(95deg,#facc15,#38bdf8)"></div></div>
+            </div>
+            <div class="card"><h3>💎 EXTRACTED SKILLS</h3><div>${skills.map(s => `<span class="skill">${s}</span>`).join('') || '<i>No skills detected</i>'}</div></div>
+            ${missing.length ? `<div class="card"><h3>📌 SKILLS TO ADD</h3>${missing.map(m => `<span style="background:#334155;padding:4px 12px;border-radius:25px;display:inline-block;margin:5px;">+ ${m}</span>`).join('')}</div>` : ''}
+            <div class="card"><h3>📊 JOB ROLE MATCHING</h3>${jobs.map((job, idx) => `<div style="margin:18px 0"><div style="display:flex;justify-content:space-between"><strong>${job.job}</strong><span>${job.score}%</span></div><div class="bar-bg"><div class="bar jobBar-${idx}" style="background:${job.score>70?'#22c55e':job.score>45?'#facc15':'#f97316'}"></div></div></div>`).join('')}</div>
+        `;
+        targetDiv.innerHTML = html;
+        let current = 0;
+        const target = totalScore;
+        const scoreSpan = targetDiv.querySelector('.animatedScore');
+        const mainBar = targetDiv.querySelector('.mainBar');
+        const interval = setInterval(() => {
+            if (current < target) { current += Math.ceil(target / 25); if (current > target) current = target; scoreSpan.innerText = current + '%'; mainBar.style.width = current + '%'; }
+            else clearInterval(interval);
+        }, 20);
+        jobs.forEach((_, i) => { const bar = targetDiv.querySelector(`.jobBar-${i}`); if (bar) gsap.to(bar, { width: jobs[i].score + '%', duration: 1, delay: 0.1 * i }); });
+        gsap.fromTo(targetDiv.querySelectorAll('.card'), { y: 35, opacity: 0 }, { y: 0, opacity: 1, stagger: 0.1, duration: 0.7 });
+    }
+
+    // ---------- Tab 1: Resume Skill Analyzer (paste) ----------
+    async function analyzeResume() {
+        const resume = document.getElementById('resumeText').value.trim();
+        if (!resume) { alert('Please paste your resume content'); return; }
+        const resultsDiv = document.getElementById('resultsArea');
+        resultsDiv.innerHTML = `<div class="card">Analyzing...</div>`;
+        try {
+            const response = await fetch(`${BACKEND_URL}/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ resume: resume })
+            });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+            displaySkillResults(data, resultsDiv);
+        } catch (err) {
+            resultsDiv.innerHTML = `<div class="card" style="background:#7f1a1a80;"><h3>⚠️ Error</h3><p>${err.message}</p></div>`;
+        }
+    }
+
+    // ---------- Tab 1: File upload for single resume ----------
+    const singleResumeUploadArea = document.getElementById('singleResumeUploadArea');
+    const singleResumeFileInput = document.getElementById('singleResumeFileInput');
+    singleResumeUploadArea.addEventListener('click', () => singleResumeFileInput.click());
+    singleResumeUploadArea.addEventListener('dragover', (e) => { e.preventDefault(); singleResumeUploadArea.classList.add('drag-over'); });
+    singleResumeUploadArea.addEventListener('dragleave', () => singleResumeUploadArea.classList.remove('drag-over'));
+    singleResumeUploadArea.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        singleResumeUploadArea.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && (file.name.endsWith('.txt') || file.name.endsWith('.pdf') || file.name.endsWith('.docx'))) {
+            await uploadAndAnalyzeSingleResume(file);
+        } else {
+            alert('Please upload a .txt, .pdf, or .docx file');
+        }
+    });
+    singleResumeFileInput.addEventListener('change', async (e) => {
+        if (e.target.files.length) await uploadAndAnalyzeSingleResume(e.target.files[0]);
+    });
+
+    async function uploadAndAnalyzeSingleResume(file) {
+        const resultsDiv = document.getElementById('resultsArea');
+        resultsDiv.innerHTML = `<div class="card">⏳ Uploading and analyzing ${file.name}...</div>`;
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const response = await fetch(`${BACKEND_URL}/upload_resume_file`, { method: 'POST', body: formData });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+            displaySkillResults(data, resultsDiv);
+        } catch (err) {
+            resultsDiv.innerHTML = `<div class="card" style="background:#7f1a1a80;"><h3>⚠️ Error</h3><p>${err.message}</p></div>`;
+        }
+    }
+
+    // ---------- Tab 2: Dataset Training ----------
+    let uploadedFilePath = null;
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const analyzeDatasetBtn = document.getElementById('analyzeDatasetBtn');
+
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && file.name.endsWith('.csv')) handleDatasetFile(file);
+        else alert('Please upload a CSV file');
+    });
+    fileInput.addEventListener('change', (e) => { if (e.target.files.length) handleDatasetFile(e.target.files[0]); });
+
+    async function handleDatasetFile(file) {
+        uploadArea.innerHTML = `⏳ Uploading ${file.name}...`;
+        uploadArea.style.borderColor = '#facc15';
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const response = await fetch(`${BACKEND_URL}/upload_dataset`, { method: 'POST', body: formData });
+            const data = await response.json();
+            if (response.ok && data.filepath) {
+                uploadedFilePath = data.filepath;
+                uploadArea.innerHTML = `✅ Uploaded: ${file.name}<br>Click or drag to replace`;
+                uploadArea.style.borderColor = '#22c55e';
+                analyzeDatasetBtn.disabled = false;
+            } else throw new Error(data.error || 'Upload failed');
+        } catch (err) {
+            uploadArea.innerHTML = `❌ Upload failed: ${err.message}<br>Click or drag to try again`;
+            uploadArea.style.borderColor = '#ef4444';
+            uploadedFilePath = null;
+            analyzeDatasetBtn.disabled = true;
+        }
+    }
+
+    analyzeDatasetBtn.addEventListener('click', async () => {
+        if (!uploadedFilePath) { alert('Please upload a CSV file first'); return; }
+        const resultsDiv = document.getElementById('datasetResults');
+        resultsDiv.innerHTML = '<div class="card">⏳ Training model on dataset... This may take a moment.</div>';
+        try {
+            const response = await fetch(`${BACKEND_URL}/analyze_resume_dataset`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filepath: uploadedFilePath })
+            });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+            renderDatasetResults(data);
+        } catch (err) {
+            resultsDiv.innerHTML = `<div class="card" style="background:#7f1a1a80;"><h3>⚠️ Analysis Error</h3><p>${err.message}</p></div>`;
+        }
+    });
+
+    function renderDatasetResults(data) {
+        let rocHtml = '';
+        if (data.roc_plot) rocHtml = `<h4>ROC Curves</h4><img src="data:image/png;base64,${data.roc_plot}" />`;
+        const html = `
+            <div class="card">
+                <h3>📋 Dataset Overview</h3>
+                <p><strong>Shape:</strong> ${data.shape[0]} rows, ${data.shape[1]} columns</p>
+                <p><strong>Duplicates:</strong> ${data.duplicates}</p>
+                <details><summary>⚠️ Missing Values</summary><pre>${JSON.stringify(data.missing, null, 2)}</pre></details>
+            </div>
+            <div class="card">
+                <h3>📊 Category Distribution</h3>
+                <img src="data:image/png;base64,${data.class_dist_plot}" />
+                <pre>${JSON.stringify(data.class_distribution, null, 2)}</pre>
+            </div>
+            <div class="card">
+                <h3>📏 Resume Length Distribution by Category</h3>
+                <img src="data:image/png;base64,${data.length_dist_plot}" />
+            </div>
+            <div class="card">
+                <h3>🤖 Model Performance</h3>
+                <p><strong>Logistic Regression Accuracy:</strong> ${(data.accuracy_lr * 100).toFixed(2)}%</p>
+                <p><strong>Random Forest Accuracy:</strong> ${(data.accuracy_rf * 100).toFixed(2)}%</p>
+                <h4>Classification Report (Logistic Regression)</h4>
+                <pre>${JSON.stringify(data.classification_report_lr, null, 2)}</pre>
+                <h4>Confusion Matrix</h4>
+                <img src="data:image/png;base64,${data.confusion_matrix_plot}" />
+                ${rocHtml}
+            </div>
+            <div class="card">
+                <h3>📝 Sample Predictions</h3>
+                ${data.sample_predictions.map(s => `<p><strong>Predicted:</strong> ${s.predicted}<br><em>${s.text}</em></p><hr>`).join('')}
+            </div>
+        `;
+        document.getElementById('datasetResults').innerHTML = html;
+    }
+
+    // ---------- Tab 3: Single Resume Prediction ----------
+    const predictBtn = document.getElementById('predictBtn');
+    const predictResumeText = document.getElementById('predictResumeText');
+    const predictResults = document.getElementById('predictResults');
+
+    predictBtn.addEventListener('click', async () => {
+        const resume = predictResumeText.value.trim();
+        if (!resume) { alert('Please paste a resume'); return; }
+        predictResults.innerHTML = '<div class="card">⏳ Predicting...</div>';
+        try {
+            const response = await fetch(`${BACKEND_URL}/predict_single`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ resume: resume })
+            });
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+            let probsHtml = '<h4>Category Probabilities</h4>';
+            const sorted = Object.entries(data.probabilities).sort((a,b) => b[1] - a[1]);
+            for (let [cat, prob] of sorted) {
+                const percent = (prob * 100).toFixed(1);
+                probsHtml += `
+                    <div>
+                        <strong>${cat}</strong>
+                        <div class="prob-bar">
+                            <div class="prob-fill" style="width: ${percent}%;"></div>
+                        </div>
+                        <span>${percent}%</span>
+                    </div>
+                `;
+            }
+            const html = `
+                <div class="card">
+                    <h3>🎯 Predicted Category</h3>
+                    <div style="font-size:2rem; font-weight:bold; background:linear-gradient(135deg,#38bdf8,#c084fc); -webkit-background-clip:text; background-clip:text; color:transparent;">
+                        ${data.predicted_category}
+                    </div>
+                    <p><strong>Confidence:</strong> ${(data.confidence * 100).toFixed(2)}%</p>
+                    ${probsHtml}
+                </div>
+            `;
+            predictResults.innerHTML = html;
+        } catch (err) {
+            predictResults.innerHTML = `<div class="card" style="background:#7f1a1a80;"><h3>⚠️ Prediction Error</h3><p>${err.message}</p></div>`;
+        }
+    });
+
+    // Initial states
+    analyzeDatasetBtn.disabled = true;
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.tab + 'Tab').classList.add('active');
+        });
+    });
+
+    document.getElementById('analyzeBtn').addEventListener('click', analyzeResume);
+</script>
+</body>
+</html>
