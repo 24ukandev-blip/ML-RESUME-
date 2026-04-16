@@ -1,0 +1,10 @@
+flask_cors
+pandas
+numpy
+matplotlib
+seaborn
+scikit-learn
+imblearn
+joblib
+PyPDF2
+python-docx
