@@ -45,7 +45,6 @@
         <button class="tab-btn" data-tab="predict">🔮 Single Resume Prediction</button>
     </div>
 
-    <!-- Tab 1: Resume Skill Analyzer (paste + file upload) -->
     <div id="resumeTab" class="tab-content active">
         <div class="file-upload-area" id="singleResumeUploadArea">
             📁 Click or drag a resume file (.txt, .pdf, .docx) to analyze
@@ -56,7 +55,6 @@
         <div id="resultsArea"></div>
     </div>
 
-    <!-- Tab 2: Dataset Training (CSV upload) -->
     <div id="datasetTab" class="tab-content">
         <div id="uploadArea" class="upload-area">
             📁 Drag & Drop CSV file here or click to upload<br>
@@ -67,7 +65,6 @@
         <div id="datasetResults"></div>
     </div>
 
-    <!-- Tab 3: Single Resume Prediction (using trained model) -->
     <div id="predictTab" class="tab-content">
         <textarea id="predictResumeText" placeholder="Paste a resume to predict its job category..."></textarea>
         <button id="predictBtn">🎯 Predict Category</button>
@@ -76,9 +73,9 @@
 </div>
 
 <script>
-    const BACKEND_URL = 'http://127.0.0.1:5000';
+    // Use relative paths – the backend is served under /api
+    const BACKEND_URL = '';
 
-    // Helper: display skill analysis results (with animation)
     function displaySkillResults(data, targetDiv) {
         const skills = data.skills || [];
         const jobs = data.jobs || [];
@@ -109,14 +106,14 @@
         gsap.fromTo(targetDiv.querySelectorAll('.card'), { y: 35, opacity: 0 }, { y: 0, opacity: 1, stagger: 0.1, duration: 0.7 });
     }
 
-    // ---------- Tab 1: Resume Skill Analyzer (paste) ----------
+    // ---------- Tab 1 ----------
     async function analyzeResume() {
         const resume = document.getElementById('resumeText').value.trim();
         if (!resume) { alert('Please paste your resume content'); return; }
         const resultsDiv = document.getElementById('resultsArea');
         resultsDiv.innerHTML = `<div class="card">Analyzing...</div>`;
         try {
-            const response = await fetch(`${BACKEND_URL}/analyze`, {
+            const response = await fetch(`${BACKEND_URL}/api/analyze`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ resume: resume })
@@ -129,7 +126,6 @@
         }
     }
 
-    // ---------- Tab 1: File upload for single resume ----------
     const singleResumeUploadArea = document.getElementById('singleResumeUploadArea');
     const singleResumeFileInput = document.getElementById('singleResumeFileInput');
     singleResumeUploadArea.addEventListener('click', () => singleResumeFileInput.click());
@@ -155,7 +151,7 @@
         const formData = new FormData();
         formData.append('file', file);
         try {
-            const response = await fetch(`${BACKEND_URL}/upload_resume_file`, { method: 'POST', body: formData });
+            const response = await fetch(`${BACKEND_URL}/api/upload_resume_file`, { method: 'POST', body: formData });
             const data = await response.json();
             if (data.error) throw new Error(data.error);
             displaySkillResults(data, resultsDiv);
@@ -164,7 +160,7 @@
         }
     }
 
-    // ---------- Tab 2: Dataset Training ----------
+    // ---------- Tab 2 ----------
     let uploadedFilePath = null;
     const uploadArea = document.getElementById('uploadArea');
     const fileInput = document.getElementById('fileInput');
@@ -188,7 +184,7 @@
         const formData = new FormData();
         formData.append('file', file);
         try {
-            const response = await fetch(`${BACKEND_URL}/upload_dataset`, { method: 'POST', body: formData });
+            const response = await fetch(`${BACKEND_URL}/api/upload_dataset`, { method: 'POST', body: formData });
             const data = await response.json();
             if (response.ok && data.filepath) {
                 uploadedFilePath = data.filepath;
@@ -209,7 +205,7 @@
         const resultsDiv = document.getElementById('datasetResults');
         resultsDiv.innerHTML = '<div class="card">⏳ Training model on dataset... This may take a moment.</div>';
         try {
-            const response = await fetch(`${BACKEND_URL}/analyze_resume_dataset`, {
+            const response = await fetch(`${BACKEND_URL}/api/analyze_resume_dataset`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filepath: uploadedFilePath })
@@ -259,7 +255,7 @@
         document.getElementById('datasetResults').innerHTML = html;
     }
 
-    // ---------- Tab 3: Single Resume Prediction ----------
+    // ---------- Tab 3 ----------
     const predictBtn = document.getElementById('predictBtn');
     const predictResumeText = document.getElementById('predictResumeText');
     const predictResults = document.getElementById('predictResults');
@@ -269,7 +265,7 @@
         if (!resume) { alert('Please paste a resume'); return; }
         predictResults.innerHTML = '<div class="card">⏳ Predicting...</div>';
         try {
-            const response = await fetch(`${BACKEND_URL}/predict_single`, {
+            const response = await fetch(`${BACKEND_URL}/api/predict_single`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ resume: resume })
@@ -306,10 +302,8 @@
         }
     });
 
-    // Initial states
     analyzeDatasetBtn.disabled = true;
 
-    // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
